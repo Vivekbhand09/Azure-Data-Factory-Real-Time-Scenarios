@@ -127,7 +127,9 @@ Copy Activity (filter by Last Modified >= max_value)
 ### 🐢 Why ForEach is Sequential
 Each iteration reads and updates `temp_max_value`. Running in parallel would cause several iterations to read and write the variable at the same time and give wrong results.
 
+![Scenario 1 pipeline](Utilities/scene1.jpg)
 
+![Scenario 1 pipeline](Utilities/scene11.jpg)
 ---
 
 ## 🔍 Scenario 2: Copy Only Missing Files (Reconciliation)
@@ -177,6 +179,7 @@ Condition: @not(contains(activity('GetSink').output.childItems, item()))
 ### ⚡ Sequential vs Parallel
 There is no shared variable here, so each copy is independent and the ForEach can run in **parallel** for speed.
 
+![Scenario 2 pipeline](Utilities/scene2.jpg)
 ---
 
 ## 🕐 Scenario 3: Fetch Files Modified in the Last 1 Day
@@ -218,6 +221,11 @@ The resulting list can then be passed to **ForEach + Copy** for processing.
 
 Storage `lastModified` values are in UTC, so comparing UTC to UTC is safe.
 
+
+![Scenario 1 pipeline](Utilities/scene3.jpg)
+
+![Scenario 1 pipeline](Utilities/scene31.jpg)
+
 ---
 
 ## 🧹 Scenario 4: Delete Files Older Than 7 Days (Retention Cleanup)
@@ -252,11 +260,17 @@ ForEach
 
 **Parameter:** `p_last7days` (for example `-7`). Because the retention period is a parameter, the same pipeline works for daily, weekly or monthly cleanup by changing the value.
 
+
 ### 📌 Important points
 - ➖ **The parameter must be negative.** `addDays()` needs `-7` to go back in time. A positive `7` calculates a date in the future and would match almost every file.
 - 🛡️ **The inner check is a safety double-check.** Get Metadata1 already returns only old files, so Get Metadata2 and the If Condition are technically redundant. I kept them as an extra safeguard before an irreversible delete.
 - 📜 **Enable logging** in the Delete Activity so there is a record of what was deleted.
 - 🚀 **Safer alternatives for production:** archive files to a cooler tier or archive container first, and enable **Blob soft delete / versioning** as a recovery net.
+
+
+![Scenario 1 pipeline](Utilities/scene4.jpg)
+
+![Scenario 1 pipeline](Utilities/scene41.jpg)
 
 ---
 
@@ -299,6 +313,10 @@ Get Metadata (Child items)  ->  Set Variable (fileCount)  ->  If Condition (file
 For a **files-only** count:
 1. Add a **Filter** activity: Items = `@activity('Get Metadata1').output.childItems`, Condition = `@equals(item().type, 'File')`
 2. Count the result: `@length(activity('Filter1').output.Value)`
+
+![Scenario 1 pipeline](Utilities/scene5.jpg)
+
+![Scenario 1 pipeline](Utilities/scene51.jpg)
 
 ### 🤔 Why it matters
 Without this check, a pipeline can "succeed" while processing **zero files** because an upstream system failed to deliver data. A count check makes that failure visible.
@@ -365,6 +383,7 @@ If the file name contains `demand`, use the demand mapping. Otherwise use the re
 - Changing a mapping means editing one parameter
 - Fully explicit control over renames, types and columns
 
+![Scenario 1 pipeline](Utilities/scene6.jpg)
 ---
 
 ## 📊 Summary of All Scenarios
