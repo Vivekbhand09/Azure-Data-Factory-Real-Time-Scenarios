@@ -1,51 +1,62 @@
-# Azure Data Factory: Real-Time Scenarios
+<div align="center">
+
+![Azure Data Factory](https://img.shields.io/badge/Azure_Data_Factory-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)
+![ADLS Gen2](https://img.shields.io/badge/ADLS_Gen2-0062AD?style=for-the-badge&logo=microsoftazure&logoColor=white)
+![JSON](https://img.shields.io/badge/JSON-000000?style=for-the-badge&logo=json&logoColor=white)
+![Data Engineering](https://img.shields.io/badge/Data_Engineering-FF6F00?style=for-the-badge)
+![ETL](https://img.shields.io/badge/ETL_Pipelines-2E7D32?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Learning_Project-blueviolet?style=for-the-badge)
+
+</div>
+
+# 🏭 Azure Data Factory: Real-Time Scenarios
 
 A hands-on collection of **6 real-world pipelines** I built in **Azure Data Factory (ADF)** while learning data engineering. Each scenario has a short theory section, then exactly how I implemented it (activities, settings and expressions).
 
-> **About this repo:** This is a learning project. I am still growing my ADF knowledge, so each scenario also lists the **limitations** I found and how a production version could be improved.
+> 💡 **About this repo:** This is a learning project. I am still growing my ADF knowledge, so each scenario also lists the **limitations** I found and how a production version could be improved.
 
 ---
 
-## Table of Contents
+## 📑 Table of Contents
 
-1. [Tools and Concepts Used](#tools-and-concepts-used)
-2. [Scenario 1: Incremental Load Using File Last-Modified Date](#scenario-1-incremental-load-using-file-last-modified-date)
-3. [Scenario 2: Copy Only Missing Files (Reconciliation)](#scenario-2-copy-only-missing-files-reconciliation)
-4. [Scenario 3: Fetch Files Modified in the Last 1 Day](#scenario-3-fetch-files-modified-in-the-last-1-day)
-5. [Scenario 4: Delete Files Older Than 7 Days (Retention Cleanup)](#scenario-4-delete-files-older-than-7-days-retention-cleanup)
-6. [Scenario 5: Store the Number of Files in a Variable](#scenario-5-store-the-number-of-files-in-a-variable)
-7. [Scenario 6: Dynamic Column Mapping](#scenario-6-dynamic-column-mapping)
-8. [Summary of All Scenarios](#summary-of-all-scenarios)
-9. [Key Takeaways](#key-takeaways)
+1. [Tools and Concepts Used](#-tools-and-concepts-used)
+2. [Scenario 1: Incremental Load Using File Last-Modified Date](#-scenario-1-incremental-load-using-file-last-modified-date)
+3. [Scenario 2: Copy Only Missing Files (Reconciliation)](#-scenario-2-copy-only-missing-files-reconciliation)
+4. [Scenario 3: Fetch Files Modified in the Last 1 Day](#-scenario-3-fetch-files-modified-in-the-last-1-day)
+5. [Scenario 4: Delete Files Older Than 7 Days (Retention Cleanup)](#-scenario-4-delete-files-older-than-7-days-retention-cleanup)
+6. [Scenario 5: Store the Number of Files in a Variable](#-scenario-5-store-the-number-of-files-in-a-variable)
+7. [Scenario 6: Dynamic Column Mapping](#-scenario-6-dynamic-column-mapping)
+8. [Summary of All Scenarios](#-summary-of-all-scenarios)
+9. [Key Takeaways](#-key-takeaways)
 
 ---
 
-## Tools and Concepts Used
+## 🧰 Tools and Concepts Used
 
-**Services:** Azure Data Factory, Azure Data Lake Storage Gen2 (ADLS Gen2)
+**☁️ Services:** Azure Data Factory, Azure Data Lake Storage Gen2 (ADLS Gen2)
 
 | Concept | What it does (in simple words) |
 |---|---|
-| **Dataset** | Points to the data (a folder or a file) in storage |
-| **Parameterised dataset** | A dataset with parameters (container, folder, file) so one dataset can be reused for many locations |
-| **Get Metadata** | Reads information about a folder or file (list of items, last modified time, etc.) |
-| **ForEach** | Loops over a list and runs activities once per item |
-| **Filter** | Keeps only the items in a list that satisfy a condition (like `WHERE` in SQL) |
-| **If Condition** | Runs different activities depending on whether a condition is true or false |
-| **Set Variable** | Stores a value in a pipeline variable |
-| **Copy Activity** | Copies data from a source to a sink (destination) |
-| **Delete Activity** | Deletes files from storage |
-| **Pipeline parameters** | Values passed into the pipeline when it runs (makes it reusable) |
-| **Expressions / functions** | Dynamic logic such as `utcNow()`, `addDays()`, `contains()`, `length()`, `if()` |
+| 📂 **Dataset** | Points to the data (a folder or a file) in storage |
+| 🎛️ **Parameterised dataset** | A dataset with parameters (container, folder, file) so one dataset can be reused for many locations |
+| 🔎 **Get Metadata** | Reads information about a folder or file (list of items, last modified time, etc.) |
+| 🔁 **ForEach** | Loops over a list and runs activities once per item |
+| 🧪 **Filter** | Keeps only the items in a list that satisfy a condition (like `WHERE` in SQL) |
+| 🔀 **If Condition** | Runs different activities depending on whether a condition is true or false |
+| 📝 **Set Variable** | Stores a value in a pipeline variable |
+| 📋 **Copy Activity** | Copies data from a source to a sink (destination) |
+| 🗑️ **Delete Activity** | Deletes files from storage |
+| ⚙️ **Pipeline parameters** | Values passed into the pipeline when it runs (makes it reusable) |
+| 🧮 **Expressions / functions** | Dynamic logic such as `utcNow()`, `addDays()`, `contains()`, `length()`, `if()` |
 
-### Datasets used across scenarios
+### 📦 Datasets used across scenarios
 
 | Dataset | Parameters | Purpose |
 |---|---|---|
 | `ds_param_folderlevel` | `p_container`, `p_folder` | Represents a **folder** (used to list what is inside) |
 | `ds_file_level` | `p_container`, `p_folder`, `p_file` | Represents a **single file** (used to read or copy that file) |
 
-### Common pattern in most scenarios
+### 🧬 Common pattern in most scenarios
 
 ```
 Get Metadata (discover files)  ->  Filter / If (decide what to process)  ->  ForEach (loop)  ->  Copy / Delete (do the work)
@@ -53,23 +64,23 @@ Get Metadata (discover files)  ->  Filter / If (decide what to process)  ->  For
 
 ---
 
-## Scenario 1: Incremental Load Using File Last-Modified Date
+## 🔄 Scenario 1: Incremental Load Using File Last-Modified Date
 
-### Goal
+### 🎯 Goal
 Copy the **latest file** from a source folder instead of reloading everything each run.
 
-### Theory
+### 📖 Theory
 **Incremental loading** means processing only **new or changed** data instead of everything, every time. It saves time, cost and avoids duplicates.
 
 Common ways to detect "what is new":
 
 | Strategy | How it works |
 |---|---|
-| Watermark column (databases) | Only pull rows greater than the last stored value |
-| **File last-modified (used here)** | Compare each file's `lastModified` time to find the newest |
-| Change Data Capture (CDC) | Database tracks inserts, updates and deletes |
+| 💧 Watermark column (databases) | Only pull rows greater than the last stored value |
+| 🕒 **File last-modified (used here)** | Compare each file's `lastModified` time to find the newest |
+| 📡 Change Data Capture (CDC) | Database tracks inserts, updates and deletes |
 
-### Pipeline flow
+### 🔀 Pipeline flow
 
 ```
 Get Metadata1 (list all files)
@@ -87,7 +98,7 @@ Set Variable max_value = temp_max_value
 Copy Activity (filter by Last Modified >= max_value)
 ```
 
-### Implementation
+### 🔧 Implementation
 
 | Step | Activity | Settings |
 |---|---|---|
@@ -113,14 +124,14 @@ Copy Activity (filter by Last Modified >= max_value)
 - `less(a, b)` returns true if `a < b`, meaning the current file is newer than the max seen so far.
 - This is the classic **"running maximum"** idea: walk through a list and keep the largest value seen.
 
-### Why ForEach is Sequential
+### 🐢 Why ForEach is Sequential
 Each iteration reads and updates `temp_max_value`. Running in parallel would cause several iterations to read and write the variable at the same time and give wrong results.
 
-### Limitations and how to improve
+### 🚧 Limitations and how to improve
 - **ADF variables do not persist between runs.** They reset every time the pipeline starts.
 - What this pipeline really does is **"copy the single newest file in the folder"**, not **"copy everything new since the last run"**. If two new files arrive between runs, only the newest is picked.
 - Give `temp_max_value` an old default value so the first file always wins the comparison.
-- **Production-style improvement:**
+- 🚀 **Production-style improvement:**
   1. **Lookup** activity reads the last watermark from a control table (Azure SQL) or a JSON file
   2. **Get Metadata** lists files
   3. **Filter** keeps all files newer than the watermark
@@ -129,12 +140,12 @@ Each iteration reads and updates `temp_max_value`. Running in parallel would cau
 
 ---
 
-## Scenario 2: Copy Only Missing Files (Reconciliation)
+## 🔍 Scenario 2: Copy Only Missing Files (Reconciliation)
 
-### Goal
+### 🎯 Goal
 Copy only the files that exist in the **source** but are **missing in the destination**.
 
-### Theory
+### 📖 Theory
 This is a **set difference** problem:
 
 ```
@@ -143,7 +154,7 @@ Missing files = Files in Source  -  Files in Destination
 
 **Real-world uses:** backfilling after a failed run, auditing silent copy failures, verifying a backup container is fully in sync.
 
-### Pipeline flow
+### 🔀 Pipeline flow
 
 ```
 Get Metadata (GetSource)  --\
@@ -151,7 +162,7 @@ Get Metadata (GetSource)  --\
 Get Metadata (GetSink)    --/
 ```
 
-### Implementation
+### 🔧 Implementation
 
 | Step | Activity | Settings |
 |---|---|---|
@@ -173,25 +184,25 @@ Condition: @not(contains(activity('GetSink').output.childItems, item()))
 - The Filter activity returns its result in `output.Value`.
 - `item()` is a full object like `{ "name": "sales_jan.csv", "type": "File" }`, so `contains()` compares the name **and** type.
 
-### Sequential vs Parallel
+### ⚡ Sequential vs Parallel
 There is no shared variable here, so each copy is independent and the ForEach can run in **parallel** for speed.
 
-### Limitations
+### 🚧 Limitations
 - Checks only whether a file **exists**, not whether its **content changed**. Combine with the timestamp logic from Scenario 1 to catch changed files.
 - One direction only (source to destination). Files that exist only in the destination are not handled.
 - Very large folders (tens of thousands of files) may need a different approach (Databricks, Synapse or Data Flow).
 
 ---
 
-## Scenario 3: Fetch Files Modified in the Last 1 Day
+## 🕐 Scenario 3: Fetch Files Modified in the Last 1 Day
 
-### Goal
+### 🎯 Goal
 Get only the files that were added or modified in the last 24 hours.
 
-### Theory
+### 📖 Theory
 The **Get Metadata** activity has a **"Filter by last modified"** setting with a **Start time** and **End time**. When set, `childItems` returns only files whose `lastModified` falls in that window. The filtering happens inside Get Metadata itself.
 
-### Implementation
+### 🔧 Implementation
 
 | Setting | Value |
 |---|---|
@@ -204,7 +215,7 @@ The **Get Metadata** activity has a **"Filter by last modified"** setting with a
 
 The resulting list can then be passed to **ForEach + Copy** for processing.
 
-### Rolling 24 hours vs previous calendar day
+### 📅 Rolling 24 hours vs previous calendar day
 
 | | Rolling 24-hour window (what I built) | Previous calendar day |
 |---|---|---|
@@ -213,7 +224,7 @@ The resulting list can then be passed to **ForEach + Copy** for processing.
 | Meaning | Last 24 hours from the moment the pipeline runs | Yesterday from 00:00 to 24:00 |
 | Best for | Monitoring recent activity | Daily batch reports |
 
-### Timezone note
+### 🌍 Timezone note
 `utcNow()` returns **UTC**. If a requirement is written in local time (for example IST, UTC+5:30), convert first:
 
 ```
@@ -224,15 +235,15 @@ Storage `lastModified` values are in UTC, so comparing UTC to UTC is safe.
 
 ---
 
-## Scenario 4: Delete Files Older Than 7 Days (Retention Cleanup)
+## 🧹 Scenario 4: Delete Files Older Than 7 Days (Retention Cleanup)
 
-### Goal
+### 🎯 Goal
 Automatically delete files older than a configurable number of days.
 
-### Theory
+### 📖 Theory
 A **retention policy** removes old files from a data lake to save storage cost and keep it clean. It usually runs on a schedule (daily or weekly).
 
-### Pipeline flow
+### 🔀 Pipeline flow
 
 ```
 Get Metadata1 (files older than 7 days)
@@ -244,7 +255,7 @@ ForEach
             |-- True: Delete Activity
 ```
 
-### Implementation
+### 🔧 Implementation
 
 | Step | Activity | Settings |
 |---|---|---|
@@ -256,29 +267,29 @@ ForEach
 
 **Parameter:** `p_last7days` (for example `-7`). Because the retention period is a parameter, the same pipeline works for daily, weekly or monthly cleanup by changing the value.
 
-### Important points
-- **The parameter must be negative.** `addDays()` needs `-7` to go back in time. A positive `7` calculates a date in the future and would match almost every file.
-- **The inner check is a safety double-check.** Get Metadata1 already returns only old files, so Get Metadata2 and the If Condition are technically redundant. I kept them as an extra safeguard before an irreversible delete.
-- **Enable logging** in the Delete Activity so there is a record of what was deleted.
-- **Safer alternatives for production:** archive files to a cooler tier or archive container first, and enable **Blob soft delete / versioning** as a recovery net.
+### 📌 Important points
+- ➖ **The parameter must be negative.** `addDays()` needs `-7` to go back in time. A positive `7` calculates a date in the future and would match almost every file.
+- 🛡️ **The inner check is a safety double-check.** Get Metadata1 already returns only old files, so Get Metadata2 and the If Condition are technically redundant. I kept them as an extra safeguard before an irreversible delete.
+- 📜 **Enable logging** in the Delete Activity so there is a record of what was deleted.
+- 🚀 **Safer alternatives for production:** archive files to a cooler tier or archive container first, and enable **Blob soft delete / versioning** as a recovery net.
 
 ---
 
-## Scenario 5: Store the Number of Files in a Variable
+## 🔢 Scenario 5: Store the Number of Files in a Variable
 
-### Goal
+### 🎯 Goal
 Count the files in a folder and keep the number in a variable.
 
-### Theory
+### 📖 Theory
 ADF has no dedicated "count files" activity. The standard approach is **Get Metadata (Child items) + `length()`**.
 
 Useful for:
-- **Validation:** was any file received today?
-- **Logging:** how many files were processed
-- **Branching:** different logic for small and large loads
-- **Alerting:** raise an alert if the count is 0
+- ✅ **Validation:** was any file received today?
+- 📝 **Logging:** how many files were processed
+- 🔀 **Branching:** different logic for small and large loads
+- 🚨 **Alerting:** raise an alert if the count is 0
 
-### Pipeline flow
+### 🔀 Pipeline flow
 
 ```
 Get Metadata (Child items)  ->  Set Variable (fileCount)  ->  If Condition (fileCount = 0 ?)
@@ -286,7 +297,7 @@ Get Metadata (Child items)  ->  Set Variable (fileCount)  ->  If Condition (file
                                                                  |-- False: continue processing
 ```
 
-### Implementation
+### 🔧 Implementation
 
 | Step | Activity | Settings |
 |---|---|---|
@@ -297,26 +308,26 @@ Get Metadata (Child items)  ->  Set Variable (fileCount)  ->  If Condition (file
 - ADF pipeline variables support **String, Boolean and Array** types, so the count is stored as a string. Convert with `int(variables('fileCount'))` when comparing numbers.
 - Example check: `@equals(int(variables('fileCount')), 0)`
 
-### Important nuance: files vs folders
+### 📁 Important nuance: files vs folders
 `childItems` contains **both files and subfolders**. If the folder has subfolders, plain `length()` overcounts.
 
 For a **files-only** count:
 1. Add a **Filter** activity: Items = `@activity('Get Metadata1').output.childItems`, Condition = `@equals(item().type, 'File')`
 2. Count the result: `@length(activity('Filter1').output.Value)`
 
-### Why it matters
+### 🤔 Why it matters
 Without this check, a pipeline can "succeed" while processing **zero files** because an upstream system failed to deliver data. A count check makes that failure visible.
 
 `length()` is also handy for counting Lookup rows: `@length(activity('Lookup1').output.value)`.
 
 ---
 
-## Scenario 6: Dynamic Column Mapping
+## 🧩 Scenario 6: Dynamic Column Mapping
 
-### Goal
+### 🎯 Goal
 Use **one Copy Activity** inside a ForEach to copy files that have **different schemas** (demand files and reserves files), each with its own column mapping.
 
-### Theory
+### 📖 Theory
 **Column mapping** tells the Copy Activity which source column goes to which sink column. It is needed to rename columns, skip columns, change data types or reorder columns. Without explicit mapping, ADF auto-maps by matching names.
 
 Behind the scenes, mapping is stored as a **`TabularTranslator`** JSON object:
@@ -332,9 +343,9 @@ Behind the scenes, mapping is stored as a **`TabularTranslator`** JSON object:
 }
 ```
 
-**Key idea:** this JSON is just an object, so instead of hard-coding it inside the Copy Activity, it can be supplied **dynamically** at runtime.
+🔑 **Key idea:** this JSON is just an object, so instead of hard-coding it inside the Copy Activity, it can be supplied **dynamically** at runtime.
 
-### Pipeline flow
+### 🔀 Pipeline flow
 
 ```
 Get Metadata (Child items)  ->  ForEach  ->  ONE Copy Activity
@@ -342,7 +353,7 @@ Get Metadata (Child items)  ->  ForEach  ->  ONE Copy Activity
                                                 |-- Mapping: chosen dynamically per file
 ```
 
-### Implementation
+### 🔧 Implementation
 
 | Step | What I did |
 |---|---|
@@ -364,12 +375,12 @@ Get Metadata (Child items)  ->  ForEach  ->  ONE Copy Activity
 
 If the file name contains `demand`, use the demand mapping. Otherwise use the reserves mapping.
 
-### Why this approach
+### ✨ Why this approach
 - One Copy Activity instead of one per file type
 - Changing a mapping means editing one parameter
 - Fully explicit control over renames, types and columns
 
-### Limitations and improvements
+### 🚧 Limitations and improvements
 - **Case-sensitive:** `Demand_Report.csv` would fall into the `else` branch and silently get the wrong mapping. Use `contains(toLower(item().name), 'demand')`.
 - **Not great for many file types:** nested `if()` gets messy. Better to keep the file pattern and mapping JSON in a **config table or file**, read it with a **Lookup**, and pick the matching row with a **Filter** activity.
 - **Fragile naming dependency:** a folder-per-type structure is more reliable than file name matching.
@@ -378,27 +389,27 @@ If the file name contains `demand`, use the demand mapping. Otherwise use the re
 
 ---
 
-## Summary of All Scenarios
+## 📊 Summary of All Scenarios
 
 | # | Scenario | Question it answers | Key technique |
 |---|---|---|---|
-| 1 | Incremental Load | What is the newest file? | Running max with Set Variable + If inside a sequential ForEach |
-| 2 | Missing Files | What is in source but not in destination? | Filter activity with `not(contains())` |
-| 3 | Files by Date Range | Which files changed in a time window? | Get Metadata "Filter by last modified" |
-| 4 | Delete Old Files | Which files are older than N days? | Get Metadata end-time filter + Delete Activity + parameter |
-| 5 | File Count | How many files are in the folder? | `length()` on `childItems` |
-| 6 | Dynamic Mapping | How do I map columns per file type in one Copy? | Object parameters + `if(contains())` in Mapping |
+| 1 | 🔄 Incremental Load | What is the newest file? | Running max with Set Variable + If inside a sequential ForEach |
+| 2 | 🔍 Missing Files | What is in source but not in destination? | Filter activity with `not(contains())` |
+| 3 | 🕐 Files by Date Range | Which files changed in a time window? | Get Metadata "Filter by last modified" |
+| 4 | 🧹 Delete Old Files | Which files are older than N days? | Get Metadata end-time filter + Delete Activity + parameter |
+| 5 | 🔢 File Count | How many files are in the folder? | `length()` on `childItems` |
+| 6 | 🧩 Dynamic Mapping | How do I map columns per file type in one Copy? | Object parameters + `if(contains())` in Mapping |
 
 ---
 
-## Key Takeaways
+## 🧠 Key Takeaways
 
-- **Get Metadata is the foundation.** Most real pipelines first discover what exists, then decide what to process.
-- **Parameterise everything.** Parameterised datasets and pipeline parameters make pipelines reusable.
-- **Sequential vs parallel:** use Sequential when iterations share state (Scenario 1), and Parallel when items are independent (Scenarios 2 and 4).
-- **Variables do not persist across runs.** Real incremental loads store the watermark in an external table or file.
-- **Time handling needs care:** rolling window vs calendar day, UTC vs local time, and the sign in `addDays()`.
-- **Irreversible actions need safeguards:** logging, archiving and soft delete for delete pipelines.
-- **Know the limitations.** Understanding what a pattern does not handle is as important as building it.
+- 🔎 **Get Metadata is the foundation.** Most real pipelines first discover what exists, then decide what to process.
+- 🎛️ **Parameterise everything.** Parameterised datasets and pipeline parameters make pipelines reusable.
+- ⚡ **Sequential vs parallel:** use Sequential when iterations share state (Scenario 1), and Parallel when items are independent (Scenarios 2 and 4).
+- 💾 **Variables do not persist across runs.** Real incremental loads store the watermark in an external table or file.
+- ⏱️ **Time handling needs care:** rolling window vs calendar day, UTC vs local time, and the sign in `addDays()`.
+- 🛡️ **Irreversible actions need safeguards:** logging, archiving and soft delete for delete pipelines.
+- 🚧 **Know the limitations.** Understanding what a pattern does not handle is as important as building it.
 
 ---
