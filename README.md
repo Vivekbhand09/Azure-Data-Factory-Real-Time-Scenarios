@@ -127,16 +127,6 @@ Copy Activity (filter by Last Modified >= max_value)
 ### 🐢 Why ForEach is Sequential
 Each iteration reads and updates `temp_max_value`. Running in parallel would cause several iterations to read and write the variable at the same time and give wrong results.
 
-### 🚧 Limitations and how to improve
-- **ADF variables do not persist between runs.** They reset every time the pipeline starts.
-- What this pipeline really does is **"copy the single newest file in the folder"**, not **"copy everything new since the last run"**. If two new files arrive between runs, only the newest is picked.
-- Give `temp_max_value` an old default value so the first file always wins the comparison.
-- 🚀 **Production-style improvement:**
-  1. **Lookup** activity reads the last watermark from a control table (Azure SQL) or a JSON file
-  2. **Get Metadata** lists files
-  3. **Filter** keeps all files newer than the watermark
-  4. **ForEach + Copy** copies each qualifying file
-  5. **Stored Procedure / Copy** updates the watermark after a successful run
 
 ---
 
@@ -186,11 +176,6 @@ Condition: @not(contains(activity('GetSink').output.childItems, item()))
 
 ### ⚡ Sequential vs Parallel
 There is no shared variable here, so each copy is independent and the ForEach can run in **parallel** for speed.
-
-### 🚧 Limitations
-- Checks only whether a file **exists**, not whether its **content changed**. Combine with the timestamp logic from Scenario 1 to catch changed files.
-- One direction only (source to destination). Files that exist only in the destination are not handled.
-- Very large folders (tens of thousands of files) may need a different approach (Databricks, Synapse or Data Flow).
 
 ---
 
@@ -379,13 +364,6 @@ If the file name contains `demand`, use the demand mapping. Otherwise use the re
 - One Copy Activity instead of one per file type
 - Changing a mapping means editing one parameter
 - Fully explicit control over renames, types and columns
-
-### 🚧 Limitations and improvements
-- **Case-sensitive:** `Demand_Report.csv` would fall into the `else` branch and silently get the wrong mapping. Use `contains(toLower(item().name), 'demand')`.
-- **Not great for many file types:** nested `if()` gets messy. Better to keep the file pattern and mapping JSON in a **config table or file**, read it with a **Lookup**, and pick the matching row with a **Filter** activity.
-- **Fragile naming dependency:** a folder-per-type structure is more reliable than file name matching.
-- **Schema changes are not automatic:** if a source file gets a new column, the mapping JSON must be updated by hand.
-- Make sure parameter names are spelled identically in the parameters list and the expression (`p_reserves`).
 
 ---
 
